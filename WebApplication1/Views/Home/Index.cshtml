@@ -1,0 +1,320 @@
+﻿@model WebApplication1.Models.PlacesMarkViewModel
+@{
+    ViewBag.Title = "Home Page";
+    var trackIds = ViewBag.TrackIds ?? new List<int>();
+}
+
+
+<style>
+    #map_canvas img {
+        max-width: none;
+    }
+</style>
+
+<!-- This css is to give a nice big popup "info window" when a marker is clicked on the map -->
+<style>
+    .infoDiv {
+        height: 200px;
+        width: 300px;
+        -webkit-user-select: none;
+        background-color: white;
+    }
+</style>
+<br />
+<!-- This is the div that will contain the Google Map -->
+@if (@Model.AreNotEmpty())
+{
+    <div id="map_canvas" style="height: 550px;"></div>
+}
+<script src="http://maps.google.com/maps/api/js?sensor=true" type="text/javascript"></script>
+
+<!-- Enclose the Javascript in a "section" so that it is rendered in the correct order after scripts have been loaded etc -->
+@section scripts {
+    <section class="scripts">
+
+        <script type="text/javascript">
+
+            $(document).ready(function () {
+                Initialize();
+            });
+
+            // Where all the fun happens:)
+            function Initialize() {
+                var map = setMapOptions();
+                setTracks(map);
+            }
+
+            function setMapOptions() {
+                google.maps.visualRefresh = true;
+                var centerMap = new google.maps.LatLng(48.499260, 24.115530);
+
+                // These are options that set initial zoom level, where the map is centered globally to start, and the type of map to show
+                var mapOptions = {
+                    zoom: 12,
+                    center: centerMap,
+                    mapTypeId: google.maps.MapTypeId.G_NORMAL_MAP
+                };
+
+                var map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
+                return map;
+            }
+
+            function setTracks(map) {
+                var firstMarks = @Html.Raw(Json.Encode(Model.FirstPlaceMark));
+                setItems(firstMarks, 'http://maps.google.com/mapfiles/ms/icons/blue.png', map);
+
+                var secondMarks = @Html.Raw(Json.Encode(Model.SecondPlaceMark));
+                setItems(secondMarks, 'http://maps.google.com/mapfiles/ms/icons/red.png', map);
+
+                var mutualMarks = @Html.Raw(Json.Encode(Model.MutualPlaceMarks));
+                setItems(mutualMarks, 'http://maps.google.com/mapfiles/ms/icons/green.png', map);
+            }
+
+            function setItems(marks, imageUrl, map) {
+                if (marks && marks.length > 0) {
+                    markItems(marks, imageUrl, map);
+                }
+            }
+
+            function markItems(items, imageUrl, map) {
+                $.each(items,
+                    function(i, item) {
+                        var marker = setMarker(item, imageUrl, map);
+                        setInfoWindow(marker);
+                    });
+            }
+
+            function setMarker(item, imageUrl, map) {
+                var marker = new google.maps.Marker({
+                    position: new google.maps.LatLng(item.Latitude, item.Longitude),
+                    title: item.Name,
+                    map: map,
+                    icon: getImage(imageUrl)
+
+                });
+                return marker;
+            }
+
+            function getImage(imageUrl) {
+                var image = {
+                    url: imageUrl,
+                    // This marker is 20 pixels wide by 32 pixels high.
+                    size: new google.maps.Size(20, 32),
+                    // The origin for this image is (0, 0).
+                    origin: new google.maps.Point(0, 0),
+                    // The anchor for this image is the base of the flagpole at (0, 32).
+                    anchor: new google.maps.Point(0, 32)
+                };
+                return image;
+            }
+
+            function setInfoWindow(marker) {
+                var infoWindow = new google.maps.InfoWindow({
+                    content: "<div class='infoDiv'><h2>" + marker.title + "</div></div>"
+                });
+
+                // finally hook up an "OnClick" listener to the map so it pops up out info-window when the marker-pin is clicked!
+                google.maps.event.addListener(marker,
+                    'click',
+                    function() {
+                        infoWindow.open(map, marker);
+                    });
+            }
+        </script>
+    </section>
+}
+
+<style>
+    table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    td, th {
+        border: 1px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+    }
+
+    tr:nth-child(even) {
+        background-color: #dddddd;
+    }
+</style>
+
+<div class="row">
+    <div class="col-md-6">
+        <h2>Basic File Upload</h2>
+        @using (Html.BeginForm("Index",
+            "Home",
+            FormMethod.Post,
+            new {enctype = "multipart/form-data"}))
+        {
+            <label for="file">Upload Image:</label>
+            <input type="file" name="file" id="file"/>
+            <input type="checkbox" hidden checked name="uploadFile" id="uploadFile" value="true"/>
+            <input type="text" placeholder="type track name" name="trackName" id="trackName"/>
+            <input type="number" placeholder="type accurancy" name="accurancy" id="accurancy" min="1"/>
+            <br><br>
+            <input type="submit" value="Upload File"/>
+
+            <br><br>
+            @ViewBag.Message
+            <br><br>
+        }
+    </div>
+
+    <div class="col-md-6">
+        <h2>Track comparison</h2>
+        @using (Html.BeginForm("Index",
+            "Home",
+            FormMethod.Post,
+            new {enctype = "multipart/form-data"}))
+        {
+            @Html.DropDownList("firstTrackId",
+                new SelectList(trackIds),
+                "Select First track",
+                new {@class = "form-control"})
+
+            @Html.DropDownList("secondTrackId",
+                new SelectList(trackIds),
+                "Select Second track",
+                new {@class = "form-control"})
+            <br><br>
+            <input type="submit" value="Compare"/>
+
+            <br><br>
+            @ViewBag.Message
+            <br><br>
+        }
+    </div>
+
+</div>
+
+<div class="row">
+    <div class="col-xs-12">(Tables below are contain only unique marks)</div>
+    <div class="col-md-6">
+        <h3>
+            First Track
+        </h3>
+        <table>
+            <thead>
+            <tr>
+                <th>
+                    Name
+                </th>
+                <th>
+                    Altitude
+                </th>
+                <th>
+                    Longitude
+                </th>
+                <th>
+                    Latitude
+                </th>
+                <th>
+                    SymbolRow
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (Model.FirstPlaceMark != null && Model.FirstPlaceMark.Any())
+            {
+
+                foreach (var item in Model.FirstPlaceMark)
+                {
+                    <tr>
+                        <td>
+                            @item.Name
+                        </td>
+                        <td>
+                            @item.Altitude
+                        </td>
+
+                        <td>
+                            @item.Longitude
+                        </td>
+                        <td>
+                            @item.Latitude
+                        </td>
+                        <td>
+                            @item.SymbolRow
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="5" class="text-center">No Data</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="col-md-6">
+        <h3>
+            Second Track
+        </h3>
+        <table>
+            <thead>
+            <tr>
+                <th>
+                    Name
+                </th>
+                <th>
+                    Altitude
+                </th>
+                <th>
+                    Longitude
+                </th>
+                <th>
+                    Latitude
+                </th>
+                <th>
+                    SymbolRow
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (Model.SecondPlaceMark != null && Model.SecondPlaceMark.Any())
+            {
+                foreach (var item in Model.SecondPlaceMark)
+                {
+                    <tr>
+                        <td>
+                            @item.Name
+                        </td>
+                        <td>
+                            @item.Altitude
+                        </td>
+
+                        <td>
+                            @item.Longitude
+                        </td>
+                        <td>
+                            @item.Latitude
+                        </td>
+                        <td>
+                            @item.SymbolRow
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="5" class="text-center">No Data</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+
+
+
+
+
